@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+
+  mysql:
+    image: mysql:8
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: products-service
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  eureka-serv:
+    build: ./eureka-serv
+    container_name: eureka-serv
+    ports:
+      - "8761:8761"
+    environment:
+      SPRING_APPLICATION_NAME: eureka-serv
+      SERVER_PORT: 8761
+      REGISTER_WITH_EUREKA: false
+      FETCH_REGISTRY: false
+      LEASE_RENEWAL_INTERVAL: 0
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    depends_on:
+      - eureka-serv
+    ports:
+      - "8080:443"
+    environment:
+      SPRING_APPLICATION_NAME: api-gateway
+      SERVER_PORT: 443
+      GATEWAY_DISCOVERY_ENABLED: true
+      GATEWAY_LOWER_CASE_ID: true
+      GATEWAY_LOG_LEVEL: DEBUG
+      NETTY_LOG_LEVEL: DEBUG
+      ROUTE_0_ID: products-service
+      ROUTE_0_URI: lb://products-service
+      ROUTE_0_PREDICATE: Path=/products-service/**
+      ROUTE_1_ID: shopping-cars-service
+      ROUTE_1_URI: lb://shopping-cars-service
+      ROUTE_1_PREDICATE: Path=/shopping-cars-service/**
+
+  products-service:
+    build: ./products-service
+    container_name: products-service
+    depends_on:
+      - mysql
+      - eureka-serv
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_APPLICATION_NAME: products-service
+      SERVER_PORT: 8081
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-serv:8761/eureka
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/products-service?serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: rootpass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.MySQL8Dialect
+
+  shopping-cars-service:
+    build: ./shopping-cars-service
+    container_name: shopping-cars-service
+    depends_on:
+      - mysql
+      - eureka-serv
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_APPLICATION_NAME: shopping-cars-service
+      SERVER_PORT: 8082
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-serv:8761/eureka
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/shopping-cars-service?serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: rootpass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.MySQL8Dialect
+
+  sells-service:
+    build: ./sells-service
+    container_name: sells-service
+    depends_on:
+      - mysql
+      - eureka-serv
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_APPLICATION_NAME: sells-service
+      SERVER_PORT: 8083
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://eureka-serv:8761/eureka
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/sells-service?serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: rootpass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_DATABASE_PLATFORM: org.hibernate.dialect.MySQL8Dialect
+
+volumes:
+  mysql_data:
